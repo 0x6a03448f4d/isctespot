@@ -1,8 +1,9 @@
-from flask import Flask, Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app
 from db.db_connector import DBConnector
 from Crypto.Cipher import DES
 from Crypto.Util.Padding import pad, unpad
 import base64
+from .jwt_utils import issue_token, validate_token
 
 auth = Blueprint('auth', __name__)
 
@@ -44,7 +45,7 @@ def login():
         decrypted_password = str(decrypt_password(encrypted_password, DES_KEY))
         print(f'Password comparsion!! input: {password} vs decrypted_password: {decrypted_password}')
     if password == decrypted_password:
-        result = dbc.execute_query(query='update_user_activity', args={
+        dbc.execute_query(query='update_user_activity', args={
             'user_id': _id,
             'active': True
         })
@@ -52,25 +53,17 @@ def login():
         print(f'Admin --> {is_admin}')
         if is_admin == 1:
             is_admin = 'true'
-            token = current_app.config['ADMIN_AUTH_TOKEN']
         else:
             is_admin = 'false'
-            token = current_app.config['AUTH_TOKEN']
 
         comp_id = dbc.execute_query(query='get_user_comp_id', args=_id)
         is_agent = dbc.execute_query('get_user_agent', args=_id)
         if not isinstance(comp_id, int):
             return jsonify({'status': 'Bad request'}), 400
 
-        return jsonify({
-            'status': 'Ok',
-            'user_id': _id, 
-            'username': username,
-            'token': token,
-            'is_admin': is_admin,
-            'comp_id': comp_id,
-            'is_agent': is_agent
-        }), 200
+        token: str = issue_token(user_id=_id, comp_id=comp_id, is_admin=(is_admin == 'true'))
+
+        return jsonify({'status': 'Ok', 'user_id': _id, 'token': token, 'is_admin': is_admin, 'comp_id': comp_id}), 200
 
     return jsonify({'status': 'Bad credentials'}), 403
 
@@ -96,12 +89,12 @@ def reset_password():
     user_id = dict_data['user_id']
     new_password = dict_data['new_password']
     token = dict_data['token']
-
-    if token != current_app.config["AUTH_TOKEN"] and token != current_app.config["ADMIN_AUTH_TOKEN"]:
+    is_valid, _payload = validate_token(token)
+    if not is_valid:
         return jsonify({'status': 'Unauthorised'}), 403
-
+    if _payload['is_admin']:
+        user_id = _payload['user_id']
     encrypted_password = encrypt_password(new_password, DES_KEY)
-    
     result = dbc.execute_query(query='update_user_password', args={
         "user_id": user_id,
         "new_password": encrypted_password
@@ -142,6 +135,7 @@ def signup():
         'user_id': user_id,
         'comp_id': comp_id
     })
+    token: str = issue_token(user_id=user_id, comp_id=comp_id, is_admin=True)
     if isinstance(result, int):
         return jsonify(
             {
@@ -149,7 +143,7 @@ def signup():
                 'comp_id': comp_id,
                 'user_id': user_id,
                 'is_admin': True,
-                'token': current_app.config["ADMIN_AUTH_TOKEN"]
+                'token': token
             }
         ), 200
     else:
@@ -160,7 +154,8 @@ def new_employee():
     ''' Create new employee function '''
     dbc = DBConnector()
     dict_data = request.get_json()
-    if dict_data['token'] != current_app.config['ADMIN_AUTH_TOKEN']:
+    is_valid, payload = validate_token(dict_data.get('token'))
+    if not is_valid or not payload.get('is_admin'):
         return jsonify({'status': 'Unauthorized'}), 403
     result = dbc.execute_query('create_user_employee', args={
         'username': dict_data['username'],
@@ -177,8 +172,11 @@ def retire():
     ''' Retire function, delete company and all employees '''
     dbc = DBConnector()
     dict_data = request.get_json()
-    if dict_data['token'] != current_app.config['ADMIN_AUTH_TOKEN']:
+    is_valid, payload = validate_token(dict_data.get('token'))
+    if not is_valid or not payload.get('is_admin'):
         return jsonify({'status': 'Unauthorized'}), 403
+    comp_id = payload['comp_id']
+    user_id = payload['user_id']
     result = dbc.execute_query(query='delete_sales_by_comp_id', args=dict_data['comp_id'])
     if result is False:
         return jsonify({'status': 'Bad request'}), 400
@@ -204,7 +202,8 @@ def delete_employee():
     ''' Delete employee function '''
     dbc = DBConnector()
     dict_data = request.get_json()
-    if dict_data['token'] != current_app.config['ADMIN_AUTH_TOKEN']:
+    is_valid, payload = validate_token(dict_data.get('token'))
+    if not is_valid or not payload.get('is_admin'):
         return jsonify({'status': 'Unauthorized'}), 403
     result = dbc.execute_query('delete_user_by_id', dict_data['employee_id'])
     if result is True:
