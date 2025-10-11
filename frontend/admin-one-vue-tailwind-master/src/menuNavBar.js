@@ -9,7 +9,8 @@ import {
   mdiLogout,
   mdiThemeLightDark,
   mdiGithub,
-  mdiReact
+  mdiReact,
+  mdiFaceAgent
 } from '@mdi/js'
 
 export default [
@@ -22,8 +23,9 @@ export default [
         to: '/profile'
       },
       {
-        icon: mdiEmail,
-        label: 'Messages'
+        icon: mdiFaceAgent,
+        label: 'Support',
+        to: '/support'
       },
       {
         isDivider: true

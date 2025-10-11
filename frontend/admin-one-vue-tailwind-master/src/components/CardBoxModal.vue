@@ -6,6 +6,9 @@ import BaseButtons from '@/components/BaseButtons.vue'
 import CardBox from '@/components/CardBox.vue'
 import OverlayLayer from '@/components/OverlayLayer.vue'
 import CardBoxComponentTitle from '@/components/CardBoxComponentTitle.vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const props = defineProps({
   title: {
@@ -24,6 +27,9 @@ const props = defineProps({
     type: String,
     required: true
   },
+  updateOnDone: {
+    type: String,
+  },
   hasCancel: Boolean,
   modelValue: {
     type: [String, Number, Boolean],
@@ -40,6 +46,11 @@ const value = computed({
 
 const confirmCancel = (mode) => {
   value.value = false
+  console.log(props.updateOnDone)
+  if(props.updateOnDone != undefined || props.updateOnDone != ''){
+    router.replace(props.updateOnDone)
+    router.go(0)
+  }
   emit(mode)
 }
 
@@ -75,7 +86,6 @@ window.addEventListener('keydown', (e) => {
       <div class="space-y-3">
         <slot />
       </div>
-
       <template #footer>
         <BaseButtons>
           <BaseButton :label="buttonLabel" :color="button" @click="confirm" />

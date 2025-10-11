@@ -4,6 +4,7 @@ from api.auth.routes import auth
 from api.company.routes import company
 from api.sales.routes import sales
 from api.clients.routes import clients
+from api.admin.routes import admin
 
 def create_app(config_file='settings.py'):
     ''' we add template from folder templates inside app directory '''
@@ -13,9 +14,11 @@ def create_app(config_file='settings.py'):
     CORS(clients, origins=["*"])
     CORS(sales, origins=["*"])
     CORS(company, origins=["*"])
+    CORS(admin, origins=["*"])
     app.register_blueprint(auth)
     app.register_blueprint(company)
     app.register_blueprint(sales)
     app.register_blueprint(clients)
+    app.register_blueprint(admin)
 
     return app

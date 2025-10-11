@@ -1,7 +1,7 @@
 import mariadb
 
 connection = mariadb.connect(
-    host="mariadb",
+    host="localhost",
     user="root",
     password="teste123",
     port=3306
@@ -32,6 +32,7 @@ try:
         LastLogout TIMESTAMP NULL DEFAULT NULL,
         isActive TINYINT(1) NULL DEFAULT '0',
         IsAdmin TINYINT(1) NULL DEFAULT '0',
+        IsAgent TINYINT(1) NULL DEFAULT '0',
         PRIMARY KEY (UserID) USING BTREE,
         UNIQUE INDEX Username (Username) USING BTREE,
         UNIQUE INDEX Email (Email) USING BTREE,
@@ -108,7 +109,27 @@ try:
     COLLATE='latin1_swedish_ci'
     ENGINE=InnoDB
     AUTO_INCREMENT=1;
-
+    
+    CREATE TABLE IF NOT EXISTS SupportTickets (
+        TicketID INT(11) NOT NULL AUTO_INCREMENT,
+        UserID INT(11) NULL,  -- Allow NULLs for ON DELETE SET NULL
+        Status VARCHAR(50) NOT NULL COLLATE 'latin1_swedish_ci',
+        Category VARCHAR(100) NOT NULL COLLATE 'latin1_swedish_ci',
+        Description LONGTEXT NOT NULL COLLATE 'latin1_swedish_ci',
+        Messages JSON NULL,
+        CreatedAt TIMESTAMP NULL DEFAULT current_timestamp(),
+        UpdatedAt TIMESTAMP NULL DEFAULT NULL ON UPDATE current_timestamp(),
+        PRIMARY KEY (TicketID) USING BTREE,
+        INDEX UserID (UserID) USING BTREE,
+        CONSTRAINT supporttickets_ibfk_1 
+            FOREIGN KEY (UserID) 
+            REFERENCES Users (UserID) 
+            ON UPDATE RESTRICT 
+            ON DELETE SET NULL
+    )
+    COLLATE='latin1_swedish_ci'
+    ENGINE=InnoDB
+    AUTO_INCREMENT=1;
     """
 
     # Executing the SQL statements

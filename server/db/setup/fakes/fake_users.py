@@ -11,7 +11,8 @@ data = [
         "CommissionPercentage": 15,
         "LastLogout": "2024-08-21 17:45:11",
         "isActive": 1,
-        "IsAdmin": 1
+        "IsAdmin": 1,
+        "IsAgent": 0
     },
     {
         "UserID": 2,
@@ -25,7 +26,8 @@ data = [
         "CommissionPercentage": 7,
         "LastLogout": "2024-08-21 18:05:09",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 3,
@@ -39,7 +41,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 17:30:07",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 4,
@@ -53,7 +56,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 16:00:53",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 5,
@@ -67,7 +71,8 @@ data = [
         "CommissionPercentage": 6,
         "LastLogout": "2024-08-21 18:15:10",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 6,
@@ -81,7 +86,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 17:00:55",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 7,
@@ -95,7 +101,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 16:30:47",
         "isActive": 1,
-        "IsAdmin": 1
+        "IsAdmin": 1,
+        "IsAgent": 0
     },
     {
         "UserID": 8,
@@ -109,7 +116,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 16:45:12",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 9,
@@ -123,7 +131,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 18:00:11",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 10,
@@ -137,7 +146,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 17:15:30",
         "isActive": 1,
-        "IsAdmin": 1
+        "IsAdmin": 1,
+        "IsAgent": 0
     },
     {
         "UserID": 11,
@@ -151,7 +161,8 @@ data = [
         "CommissionPercentage": 8,
         "LastLogout": "2024-08-21 16:15:55",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 12,
@@ -165,7 +176,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 16:50:43",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 13,
@@ -179,7 +191,8 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 17:40:50",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 14,
@@ -193,7 +206,8 @@ data = [
         "CommissionPercentage": 6,
         "LastLogout": "2024-08-21 16:55:38",
         "isActive": 1,
-        "IsAdmin": 0
+        "IsAdmin": 0,
+        "IsAgent": 0
     },
     {
         "UserID": 15,
@@ -207,6 +221,37 @@ data = [
         "CommissionPercentage": 5,
         "LastLogout": "2024-08-21 18:10:45",
         "isActive": 1,
-        "IsAdmin": 1
-    }
+        "IsAdmin": 1,
+        "IsAgent": 0
+    },
+    {
+        "UserID": 16,
+        "Username": "adam@isctespot",
+        "PasswordHash": "imXg6AUytfosOIVR1/SJ7A==",
+        "Email": "adam@isctespot.com",
+        "CreatedAt": "2024-09-17 13:40:30",
+        "LastLogin": "2024-10-31 10:20:15",
+        "CompanyID": 0,
+        "ResetPassword": 1,
+        "CommissionPercentage": 0,
+        "LastLogout": "2024-08-21 18:10:45",
+        "isActive": 1,
+        "IsAdmin": 1,
+        "IsAgent": 1
+    },
+    {
+        "UserID": 17,
+        "Username": "alice@isctespot",
+        "PasswordHash": "Uck5pVs6kTbvbuLsMwqkFQ==",
+        "Email": "alice@isctespot.com",
+        "CreatedAt": "2024-09-05 13:40:30",
+        "LastLogin": "2024-10-21 10:20:15",
+        "CompanyID": 0,
+        "ResetPassword": 1,
+        "CommissionPercentage": 0,
+        "LastLogout": "2024-08-21 18:10:45",
+        "isActive": 0,
+        "IsAdmin": 0,
+        "IsAgent": 1
+    },
 ]

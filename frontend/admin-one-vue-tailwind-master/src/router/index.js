@@ -121,6 +121,22 @@ const routes = [
   },
   {
     meta: {
+      title: 'Support'
+    },
+    path: '/support',
+    name: 'support',
+    component: () => import('@/views/SupportView.vue')
+  },
+  {
+    meta: {
+      title: 'NewTicket'
+    },
+    path: '/support/new-ticket',
+    name: 'new-ticket',
+    component: () => import('@/views/NewTicketView.vue')
+  },
+  {
+    meta: {
       title: 'Ui'
     },
     path: '/ui',

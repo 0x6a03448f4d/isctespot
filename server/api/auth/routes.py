@@ -57,6 +57,7 @@ def login():
             is_admin = 'false'
 
         comp_id = dbc.execute_query(query='get_user_comp_id', args=_id)
+        is_agent = dbc.execute_query('get_user_agent', args=_id)
         if not isinstance(comp_id, int):
             return jsonify({'status': 'Bad request'}), 400
 
@@ -111,7 +112,7 @@ def signup():
     user_id = 0
     
     encrypted_password = encrypt_password(dict_data['password'], DES_KEY)
-    
+
     result = dbc.execute_query('create_user_admin', args={
         "username": dict_data['username'],
         "password": encrypted_password,
