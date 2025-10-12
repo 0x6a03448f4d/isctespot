@@ -102,6 +102,7 @@ This script will:
 - ✅ Provide database setup options ("Run all setup scripts" to set up database for the first time)
 - ✅ Start all services in development mode
 - ✅ Run health checks on all services
+- ✅ Optionally run e2e tests
 
 ### Run Application sepratly (Recommended for debug)
 
