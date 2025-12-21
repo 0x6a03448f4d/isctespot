@@ -15,7 +15,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # Trivy - Dependency Scan (Filesystem)
+      # Trivy - Dependency Scan (Filesystem) - working
 
       - name: Trivy SCA - Dependencies (FS Scan)
         uses: aquasecurity/trivy-action@0.20.0
@@ -25,19 +25,27 @@ jobs:
           severity: LOW,MEDIUM,HIGH,CRITICAL
           exit-code: 0 # don't stop the code
 
-      # Build Docker Image
-      - name: Build Docker image
-        run: docker build -t isctespot:sca .
+      # Build docker images
+      - name: Build backend image
+        run: docker build -t isctespot-backend ./server
+      - name: Build frontend image
+        run: docker build -t isctespot-frontend ./frontend/admin-one-vue-tailwind-master
 
       # Trivy - Docker Image Scan
-      
-      - name: Trivy SCA - Docker Image
+
+      # Scan backend image
+      - name: Trivy scan backend image
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: isctespot:sca
-          ignore-unfixed: true
-          severity: LOW,MEDIUM,HIGH,CRITICAL 
-          exit-code: 0 # don't stop the code
+          image-ref: isctespot-backend
+          exit-code: 0
+
+      # Scan frontend image
+      - name: Trivy scan frontend image
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: isctespot-frontend
+          exit-code: 0
 
       # OWASP Dependency-Check 
 
