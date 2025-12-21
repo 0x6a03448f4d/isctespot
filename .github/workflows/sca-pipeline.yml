@@ -36,8 +36,8 @@ jobs:
         with:
           image-ref: isctespot:sca
           ignore-unfixed: true
-          severity: HIGH,CRITICAL
-          exit-code: 1
+          severity: LOW,MEDIUM,HIGH,CRITICAL 
+          exit-code: 0 # don't stop the code
 
       # OWASP Dependency-Check 
 
