@@ -59,8 +59,8 @@ jobs:
         with:
           project: "IscteSpot"
           path: "."
-          format: "HTML"
-          out: dependency-check.html #output is not recognized by dep-check
+          format: "JSON"
+          out: dependency-check.json #output is not recognized by dep-check
  
       # SBOM - Dependency inventory (Security context)
 
@@ -81,12 +81,11 @@ jobs:
             trivy-dependencies.json
             trivy-frontend.json
             trivy-backend.json
-            dependency-check.html
+            dependency-check.json
             sbom.json
 
       - name: Upload findings to DefectDojo
         run: |
-          pip install defectdojo-api
           python scripts/upload_defectdojo.py
         env:
           DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
