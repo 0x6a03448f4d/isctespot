@@ -83,3 +83,12 @@ jobs:
             trivy-backend.json
             dependency-check.html
             sbom.json
+
+      - name: Upload findings to DefectDojo
+        run: |
+          pip install defectdojo-api
+          python scripts/upload_to_defectdojo.py
+        env:
+          DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
+          DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DEFECTDOJO_ENGAGEMENT_ID: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
