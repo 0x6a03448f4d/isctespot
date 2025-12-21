@@ -5,6 +5,7 @@
 !.github/
 !frontend/
 !server/
+!scripts/
 
 # And not this file
 !docker-compose.yml
@@ -15,6 +16,7 @@
 !.github/**
 !frontend/**
 !server/**
+!scripts/**
 
 # Ignore any other files that might exist in the root directory
 !.gitignore
