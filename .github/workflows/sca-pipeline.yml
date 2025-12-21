@@ -1,0 +1,68 @@
+name: SCA - Complete Security Pipeline
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  sca:
+    name: Software Composition Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # Trivy - Dependency Scan (Filesystem)
+
+      - name: Trivy SCA - Dependencies (FS Scan)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+      # Build Docker Image
+      - name: Build Docker image
+        run: docker build -t isctespot:sca .
+
+      # Trivy - Docker Image Scan
+      
+      - name: Trivy SCA - Docker Image
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: isctespot:sca
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+      # OWASP Dependency-Check 
+
+      - name: OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "IscteSpot"
+          path: "."
+          format: "HTML"
+
+      # SBOM - Dependency inventory (Security context)
+
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.json
+
+      # Upload SCA artifacts 
+
+      - name: Upload SCA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca-security-artifacts
+          path: |
+            sbom.json
+            dependency-check-report.html
