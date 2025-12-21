@@ -22,7 +22,8 @@ jobs:
         with:
           scan-type: fs
           ignore-unfixed: true
-          severity: LOW,MEDIUM,HIGH,CRITICAL
+          format: json
+          output: trivy-dependencies.json
           exit-code: 0 # don't stop the code
 
       # Build docker images
@@ -38,6 +39,8 @@ jobs:
         uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: isctespot-backend
+          format: json
+          output: trivy-backend.json
           exit-code: 0
 
       # Scan frontend image
@@ -45,6 +48,8 @@ jobs:
         uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: isctespot-frontend
+          format: json
+          output: trivy-frontend.json
           exit-code: 0
 
       # OWASP Dependency-Check 
@@ -54,7 +59,8 @@ jobs:
         with:
           project: "IscteSpot"
           path: "."
-          format: "HTML"
+          format: json
+          output: dependency-check.json
 
       # SBOM - Dependency inventory (Security context)
 
@@ -72,5 +78,8 @@ jobs:
         with:
           name: sca-security-artifacts
           path: |
+            trivy-dependencies.json
+            trivy-frontend.json
+            trivy-backend.json
+            dependency-check.json
             sbom.json
-            dependency-check-report.html
