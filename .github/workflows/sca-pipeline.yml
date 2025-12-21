@@ -59,8 +59,8 @@ jobs:
         with:
           project: "IscteSpot"
           path: "."
-          format: json
-          out: dependency-check.json #output is not recognized by dep-check
+          format: "HTML"
+          out: dependency-check.html #output is not recognized by dep-check
  
       # SBOM - Dependency inventory (Security context)
 
@@ -81,5 +81,5 @@ jobs:
             trivy-dependencies.json
             trivy-frontend.json
             trivy-backend.json
-            dependency-check.json
+            dependency-check.html
             sbom.json
