@@ -1,5 +1,5 @@
 import os
-from defectdojo_api import DefectDojoAPIv2
+from defectdojo_api import DefectDojoAPI
 
 dojo = DefectDojoAPIv2(
     url=os.environ["DEFECTDOJO_URL"],
