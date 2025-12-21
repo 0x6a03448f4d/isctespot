@@ -87,7 +87,7 @@ jobs:
       - name: Upload findings to DefectDojo
         run: |
           pip install defectdojo-api
-          python scripts/upload_to_defectdojo.py
+          python scripts/upload_defectdojo.py
         env:
           DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
           DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
