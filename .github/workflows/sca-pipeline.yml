@@ -59,8 +59,8 @@ jobs:
         with:
           project: "IscteSpot"
           path: "."
-          format: "JSON"
-          out: dependency-check.json #output is not recognized by dep-check
+          format: "XML"
+          out: dependency-check.xml #output is not recognized by dep-check
  
       # SBOM - Dependency inventory (Security context)
 

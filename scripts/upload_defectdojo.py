@@ -31,8 +31,8 @@ def upload_scan(file_path, scan_type, test_title=None):
         print(file_path, response.status_code, response.text)
 
 # Upload scans
-upload_scan("trivy-dependencies.json", "Trivy", "Trivy FS Dependencies")
+upload_scan("trivy-dependencies.json", "Trivy Scan", "Trivy FS Dependencies")
 upload_scan("trivy-backend.json", "Trivy Scan", "Trivy Backend docker image")
 upload_scan("trivy-frontend.json", "Trivy Scan", "Trivy Frontend docker image")
-upload_scan("dependency-check.json", "Dependency Check Scan", "OWASP Dependency-Check")
+upload_scan("dependency-check.xml", "Dependency Check Scan", "OWASP Dependency-Check")
 upload_scan("sbom.json", "CycloneDX Scan", "SBOM Inventory")
