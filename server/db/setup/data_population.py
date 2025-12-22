@@ -1,39 +1,59 @@
 import mariadb
+import sys
+import os
+import random
+
+# Adicionar a diretoria /app ao path para conseguir importar os serviços do servidor
+sys.path.append('/app')
+
+try:
+    from services.security_service import security_service
+except ImportError:
+    print("Warning: Could not import security_service. IBANs might not be encrypted correctly.")
+    security_service = None
+
 from fakes.fake_users import data as fake_users
 from fakes.fake_companies import data as fake_companies
 from fakes.fake_clients import data as fake_clients
 from fakes.fake_products import data as fake_products
 from fakes.fake_sales import data as fake_sales
 from fakes.fake_tickets import data as fake_tickets
-import random
 
 # Database connection
-db = mariadb.connect(
-    host="localhost",
-    user="root",
-    password="teste123",
-    port=3306,
-    database="iscte_spot"
-)
+try:
+    db = mariadb.connect(
+        host="mariadb",  # <--- ALTERADO DE 'localhost' PARA 'mariadb'
+        user="root",
+        password="teste123",
+        port=3306,
+        database="iscte_spot"
+    )
+    cursor = db.cursor()
+except mariadb.Error as e:
+    print(f"Error connecting to MariaDB: {e}")
+    sys.exit(1)
 
-cursor = db.cursor()
+def get_fake_iban():
+    """Gera um IBAN fictício para testes"""
+    digits = ''.join([str(random.randint(0, 9)) for _ in range(21)])
+    return f"PT50{digits}"
 
-# Function to insert data into the 'users' table
 def insert_users():
+    print("Inserting Users...")
     fake_users_tuples = [
         (
-            user["Username"],
-            user["PasswordHash"],
-            user["Email"],
-            user["CreatedAt"],
-            user["LastLogin"],
-            user["CompanyID"],
-            user["ResetPassword"],
-            user["CommissionPercentage"],
-            user["LastLogout"],
-            user["isActive"],
-            user["IsAdmin"],
-            user["IsAgent"]
+            user.get("Username"),
+            user.get("PasswordHash"),
+            user.get("Email"),
+            user.get("CreatedAt"),
+            user.get("LastLogin"),
+            user.get("CompanyID"),
+            user.get("ResetPassword", 0),
+            user.get("CommissionPercentage", 5),
+            user.get("LastLogout"),
+            user.get("isActive", 0),
+            user.get("IsAdmin", 0),
+            user.get("IsAgent", 0)
         )
         for user in fake_users
     ]
@@ -43,8 +63,8 @@ def insert_users():
     """, fake_users_tuples)
     db.commit()
 
-# Function to insert data into the 'companies' table
 def insert_companies():
+    print("Inserting Companies...")
     fake_companies_tuples = [
         (
             company["CompanyID"],
@@ -62,10 +82,20 @@ def insert_companies():
     """, fake_companies_tuples)
     db.commit()
 
-# Function to insert data into the 'clients' table
 def insert_clients():
-    fake_clients_tuples = [
-        (
+    print("Inserting Clients with Encrypted IBANs...")
+    client_tuples = []
+    
+    for client in fake_clients:
+        plain_iban = get_fake_iban()
+        encrypted_iban = None
+        if security_service:
+            try:
+                encrypted_iban = security_service.encrypt_sensitive_data(plain_iban)
+            except Exception as e:
+                print(f"Error encrypting IBAN for client {client.get('FirstName')}: {e}")
+
+        client_tuples.append((
             client["FirstName"],
             client["LastName"],
             client["Email"],
@@ -74,18 +104,18 @@ def insert_clients():
             client["City"],
             client["Country"],
             client["CreatedAt"],
-            client["CompanyID"]
-        )
-        for client in fake_clients
-    ]
+            client["CompanyID"],
+            encrypted_iban
+        ))
+
     cursor.executemany("""
-    INSERT INTO Clients (FirstName, LastName, Email, PhoneNumber, Address, City, Country, CreatedAt, CompanyID)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, fake_clients_tuples)
+    INSERT INTO Clients (FirstName, LastName, Email, PhoneNumber, Address, City, Country, CreatedAt, CompanyID, EncryptedIBAN)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, client_tuples)
     db.commit()
 
-# Function to insert data into the 'products' table
 def insert_products():
+    print("Inserting Products...")
     fake_products_tuples = [
         (
             product["ProductID"],
@@ -103,8 +133,8 @@ def insert_products():
     """, fake_products_tuples)
     db.commit()
 
-# Function to insert data into the 'sales' table
 def insert_sales():
+    print("Inserting Sales...")
     fake_sales_tuples = [
         (
             sale["UserID"],
@@ -120,8 +150,9 @@ def insert_sales():
     VALUES (%s, %s, %s, %s, %s)
     """, fake_sales_tuples)
     db.commit()
-# Function to insert data into the 'SupportTickets' table
+
 def insert_tickets():
+    print("Inserting Tickets...")
     fake_tickets_tuples = [
         (
             ticket["UserID"],
@@ -140,14 +171,13 @@ def insert_tickets():
     """, fake_tickets_tuples)
     db.commit()
 
-# Inserting data
 insert_users()
 insert_companies()
-insert_products()
 insert_clients()
+insert_products()
 insert_sales()
 insert_tickets()
-# Close connection
+
 cursor.close()
 db.close()
 

@@ -13,7 +13,9 @@ def issue_token(user_id: int, comp_id: int, is_admin: bool, is_agent: bool) -> s
     private_key = current_app.config.get('JWT_PRIVATE_PEM')
     if private_key:
         try:
+            # PyJWT 2.x retorna string, PyJWT 1.x retornava bytes
             token = jwt.encode(payload, key=private_key, algorithm='RS256')
+            # Garante compatibilidade se retornar bytes
             str_token = token.decode('utf-8') if isinstance(token, (bytes, bytearray)) else token
             return str_token
         except Exception as e:
@@ -21,7 +23,7 @@ def issue_token(user_id: int, comp_id: int, is_admin: bool, is_agent: bool) -> s
 
 def validate_token(token: str):
     """ Validate JWT token """
-    print("token", token)
+    # print("token", token) # Debug opcional
     if not token:
         return False, None
     try:
@@ -33,10 +35,10 @@ def validate_token(token: str):
     try:
         public_key_pem = current_app.config.get('JWT_PUBLIC_PEM', '')
         if public_key_pem:
-            # Use PEM string directly - PyJWT 1.5.0 should handle this
             payload = jwt.decode(
                 token,
                 key=public_key_pem,
+                algorithms=['RS256']  # <--- OBRIGATÓRIO no PyJWT 2.x
             )
             return True, payload
     except Exception as e:

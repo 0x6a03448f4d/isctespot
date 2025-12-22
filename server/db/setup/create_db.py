@@ -1,7 +1,7 @@
 import mariadb
 
 connection = mariadb.connect(
-    host="localhost",
+    host="mariadb",  # <--- ALTERADO DE 'localhost' PARA 'mariadb'
     user="root",
     password="teste123",
     port=3306
@@ -9,7 +9,6 @@ connection = mariadb.connect(
 
 cursor = connection.cursor()
 try:
-
     # Create the database if it doesn't exist
     cursor.execute("CREATE DATABASE IF NOT EXISTS iscte_spot;")
     print("Database 'iscte_spot' created or already exists.")
@@ -66,6 +65,7 @@ try:
         Address VARCHAR(255) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
         City VARCHAR(100) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
         Country VARCHAR(100) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
+        EncryptedIBAN TEXT NULL DEFAULT NULL,
         CreatedAt TIMESTAMP NULL DEFAULT current_timestamp(),
         CompanyID INT(11) NULL DEFAULT NULL,
         PRIMARY KEY (ClientID) USING BTREE,
@@ -79,7 +79,7 @@ try:
         ProductID INT(11) NOT NULL AUTO_INCREMENT,
         CompanyID INT(11) NOT NULL,
         ProductName VARCHAR(255) NOT NULL COLLATE 'latin1_swedish_ci',
-        Category VARCHAR(100) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',  -- New field for product category
+        Category VARCHAR(100) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
         FactoryPrice DECIMAL(10,2) NOT NULL,
         SellingPrice DECIMAL(10,2) NOT NULL,
         CreatedAt TIMESTAMP NULL DEFAULT current_timestamp(),
@@ -112,7 +112,7 @@ try:
     
     CREATE TABLE IF NOT EXISTS SupportTickets (
         TicketID INT(11) NOT NULL AUTO_INCREMENT,
-        UserID INT(11) NULL,  -- Allow NULLs for ON DELETE SET NULL
+        UserID INT(11) NULL,
         Status VARCHAR(50) NOT NULL COLLATE 'latin1_swedish_ci',
         Category VARCHAR(100) NOT NULL COLLATE 'latin1_swedish_ci',
         Description LONGTEXT NOT NULL COLLATE 'latin1_swedish_ci',
@@ -132,7 +132,6 @@ try:
     AUTO_INCREMENT=1;
     """
 
-    # Executing the SQL statements
     for statement in create_tables_sql.split(';'):
         if statement.strip():
             cursor.execute(statement)
