@@ -4,7 +4,7 @@ import sys
 class DBConnector:
 
     def __init__(self):
-        self.host = 'mariadb'  # <--- ALTERADO DE 'localhost' PARA 'mariadb'
+        self.host = 'mariadb'
         self.user = 'root'
         self.password = 'teste123'
         self.database = 'iscte_spot'
@@ -302,6 +302,87 @@ class DBConnector:
                     return result
                 else:
                     return False
+            
+            # --- PAGAMENTO & CARD QUERIES (NOVAS) ---
+            elif query == 'create_payment':
+                cursor.execute(
+                    """
+                    INSERT INTO Payments (CompanyID, AdminUserID, TransactionID, Amount, Status, DigitalSignature, CreatedAt)
+                    VALUES (?, ?, ?, ?, 'Pending', ?, CURRENT_TIMESTAMP)
+                    """,
+                    (args['company_id'], args['user_id'], args['transaction_id'], args['amount'], args['signature'])
+                )
+                connection.commit()
+                return cursor.lastrowid
+
+            elif query == 'update_payment_status':
+                cursor.execute(
+                    "UPDATE Payments SET Status = ? WHERE TransactionID = ?",
+                    (args['status'], args['transaction_id'])
+                )
+                connection.commit()
+                return cursor.rowcount > 0
+            
+            elif query == 'get_payment_by_transaction':
+                cursor.execute("SELECT * FROM Payments WHERE TransactionID = ?", (args,))
+                result = cursor.fetchone()
+                return result
+
+            elif query == 'update_company_card_token':
+                cursor.execute(
+                    "UPDATE Companies SET FastPayCardToken = ? WHERE CompanyID = ?",
+                    (args['token'], args['company_id'])
+                )
+                connection.commit()
+                return True
+
+            elif query == 'update_company_schedule':
+                cursor.execute(
+                    "UPDATE Companies SET PaymentSchedule = ? WHERE CompanyID = ?",
+                    (args['schedule'], args['company_id'])
+                )
+                connection.commit()
+                return True
+
+            elif query == 'get_company_card_token':
+                cursor.execute("SELECT FastPayCardToken FROM Companies WHERE CompanyID = ?", (args,))
+                result = cursor.fetchone()
+                return result['FastPayCardToken'] if result else None
+
+            # Cálculo de Comissões Reais: Soma das vendas * preço * comissão%
+            elif query == 'get_pending_commissions':
+                cursor.execute(
+                    """
+                    SELECT 
+                        u.UserID, 
+                        u.EncryptedIBAN, 
+                        SUM(s.Quantity * p.SellingPrice * (u.CommissionPercentage / 100)) as TotalToPay
+                    FROM Sales s
+                    JOIN Users u ON s.UserID = u.UserID
+                    JOIN Products p ON s.ProductID = p.ProductID
+                    WHERE u.CompanyID = ? 
+                      AND u.EncryptedIBAN IS NOT NULL
+                    GROUP BY u.UserID, u.EncryptedIBAN
+                    HAVING TotalToPay > 0
+                    """, (args,)
+                )
+                return cursor.fetchall()
+
+            elif query == 'create_audit_log':
+                cursor.execute(
+                    """
+                    INSERT INTO AuditLogs (UserID, Endpoint, Method, SourceIP, RequestHeaders, RequestBody, ResponseStatus)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (args['user_id'], args['endpoint'], args['method'], args['ip'], args['headers'], args['body'], args['status'])
+                )
+                connection.commit()
+                return True
+            
+            elif query == 'update_user_iban':
+                cursor.execute("UPDATE Users SET EncryptedIBAN = ? WHERE UserID = ?", (args['iban'], args['user_id']))
+                connection.commit()
+                return True
 
             # --- CREATE QUERIES ---
             elif query == 'create_user_employee':
@@ -341,7 +422,6 @@ class DBConnector:
                     return result
 
             elif query == 'create_client':
-                # Agora aceita EncryptedIBAN (pode ser None)
                 cursor.execute(
                     """
                     INSERT INTO Clients 
@@ -357,7 +437,7 @@ class DBConnector:
                         args['city'], 
                         args['country'], 
                         args['comp_id'],
-                        args.get('encrypted_iban') # Novo campo
+                        args.get('encrypted_iban') 
                     )
                 )
                 connection.commit()
@@ -366,6 +446,7 @@ class DBConnector:
                     return result[0]
                 else:
                     return result
+
             elif query == 'create_sale':
                 cursor.execute(
                     "INSERT INTO Sales (UserID, ClientID, ProductID, Quantity, SaleDate) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",

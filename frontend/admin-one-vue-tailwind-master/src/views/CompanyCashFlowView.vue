@@ -1,13 +1,17 @@
 <script setup>
-import { onBeforeMount, computed, ref, watch } from 'vue'
+import { onBeforeMount, computed, ref, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { mdiTableBorder, mdiArrowDownBoldCircle } from '@mdi/js'
+import { mdiTableBorder, mdiArrowDownBoldCircle, mdiCashFast, mdiCreditCard, mdiCalendarClock, mdiCheckDecagram } from '@mdi/js'
 import { useMainStore } from '@/stores/main'
 import SectionMain from '@/components/SectionMain.vue'
 import axios from 'axios'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import BaseButton from '@/components/BaseButton.vue'
+import CardBox from '@/components/CardBox.vue'
+import FormField from '@/components/FormField.vue'
+import FormControl from '@/components/FormControl.vue'
+import NotificationBar from '@/components/NotificationBar.vue'
 import * as barChartConfig from '@/components/Charts/barChart.config.js'
 import BarChart from '@/components/Charts/BarChart.vue'
 
@@ -17,51 +21,109 @@ const chartData = ref(null)
 const cashflow = computed(() => mainStore.cashFlow)
 const router = useRouter()
 
+// --- PAYMENT CONTROLS STATE (NOVO) ---
+const statusMessage = ref('')
+const statusColor = ref('info')
+
+const cardForm = reactive({
+  number: '',
+  holder: '',
+  expiry: '',
+  cvc: ''
+})
+
+const scheduleForm = reactive({
+  frequency: 'Manual'
+})
+
+const setStatus = (msg, color = 'info') => {
+  statusMessage.value = msg
+  statusColor.value = color
+  setTimeout(() => { statusMessage.value = '' }, 5000)
+}
+
+// 1. Submit Card (Tokenization)
+const submitCard = async () => {
+  try {
+    await axios.post('http://localhost:5000/company/add-card', {
+      token: localStorage.getItem('token'),
+      card_number: cardForm.number,
+      card_holder_name: cardForm.holder,
+      expiry_date: cardForm.expiry
+    })
+    setStatus("Cartão associado com sucesso!", "success")
+    cardForm.number = '' // Clear sensitive data
+    cardForm.cvc = ''
+  } catch (err) {
+    setStatus("Erro ao associar cartão: " + (err.response?.data?.error || err.message), "danger")
+  }
+}
+
+// 2. Submit Schedule
+const submitSchedule = async () => {
+  try {
+    await axios.post('http://localhost:5000/company/schedule-pay', {
+      token: localStorage.getItem('token'),
+      frequency_type: scheduleForm.frequency
+    })
+    setStatus("Agendamento atualizado!", "success")
+  } catch (err) {
+    setStatus("Erro ao agendar: " + (err.response?.data?.error || err.message), "danger")
+  }
+}
+
+// 3. Process Payment (Manual Trigger)
+const processPayment = async () => {
+  if (!confirm("Tem a certeza? Vai processar pagamentos reais para todos os funcionários.")) return
+
+  try {
+    // Simulação da Assinatura Digital do Admin (Client-side)
+    const mockSignature = "sig_rsa_sha256_" + Date.now().toString(16)
+
+    const response = await axios.post('http://localhost:5000/company/pay', {
+      token: localStorage.getItem('token')
+    }, {
+      headers: { 'X-Admin-Signature': mockSignature }
+    })
+
+    if (response.data.total_paid > 0) {
+        setStatus(`Sucesso! Total Pago: €${response.data.total_paid} a ${response.data.recipients_count} funcionários.`, "success")
+        // Refresh cashflow data
+        mainStore.getCompanyCashFlow()
+    } else {
+        setStatus("Processado, mas não havia pagamentos pendentes.", "warning")
+    }
+  } catch (err) {
+    setStatus("Falha no pagamento: " + (err.response?.data?.error || err.message), "danger")
+  }
+}
+
 const invoice = (filename) => {
   filename = 'invoice.pdf'
   axios({
     url: `http://localhost:5000/invoice?filename=${filename}`,
     method: 'GET',
-    responseType: 'blob', // Specify responseType as blob to handle binary data
+    responseType: 'blob',
   })
   .then((response) => {
-    // To download the file
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-
-    // Optional: Set the filename for the downloaded file (e.g., `filename` from the response headers or query param)
-    link.setAttribute('download', filename); 
-
-    // Append to the document, click to trigger the download, then remove the link
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    // Save other response data if necessary (token, user info, etc.)
-    localStorage.setItem('token', response.headers['auth-token']); // Assuming token is sent in headers
-    localStorage.setItem('userId', response.headers['user-id']);
-    localStorage.setItem('isAdmin', response.headers['is-admin']);
-    localStorage.setItem('companyId', response.headers['comp-id']);
-    localStorage.setItem('username', form.login);
-
-    // Redirect to the dashboard
-    router.push('/dashboard');
   })
   .catch((error) => {
     alert(error.message);
   });
 }
 
-// Busca os dados de cashflow antes de montar o componente
 onBeforeMount(() => {
-  console.log('onBeforeMount')
   mainStore.getCompanyCashFlow()
 })
 
-// Observa mudanças em cashflow e gera dados do gráfico quando os dados estão prontos
 watch(cashflow, (newCashflow) => {
-  console.log('Cashflow Watch:', newCashflow)
   if (newCashflow && newCashflow.status === 'Ok') {
     const apiDataJuly = {
       profit: newCashflow.July.profit,
@@ -82,7 +144,6 @@ watch(cashflow, (newCashflow) => {
       prodCosts: newCashflow.August.prod_costs
     }
 
-    // Valores para três meses
     const dataForThreeMonths = [
       apiDataJuly.profit,
       apiDataAugust.profit,
@@ -101,21 +162,16 @@ watch(cashflow, (newCashflow) => {
       parseInt(apiDataSeptember.vat_value)
     ]
 
-    const subscription = [ 
-      500,
-      500,
-      500
-    ]
+    const subscription = [ 500, 500, 500 ]
 
     const prodCosts = [
       apiDataJuly.prodCosts,
       apiDataAugust.prodCosts,
-      apiDataSeptember.prodCosts      
+      apiDataSeptember.prodCosts
     ]
-    
-    // Gera os dados do gráfico
+
     chartData.value = barChartConfig.generateBarChartData({
-      labels: ['July', 'August', 'September'],  // Labels para os meses
+      labels: ['July', 'August', 'September'],
       datasets: [
         {
           label: 'Profit',
@@ -155,14 +211,14 @@ watch(cashflow, (newCashflow) => {
       ]
     })
   }
-}, { immediate: true }) // O watcher executa imediatamente quando cashflow está disponível
+}, { immediate: true })
 
 </script>
 
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <SectionTitleLineWithButton :icon="mdiTableBorder" title="Cash Flow" main>
+      <SectionTitleLineWithButton :icon="mdiCashFast" title="Automatic Payments Control" main>
         <BaseButton
           target="_blank"
           :icon="mdiArrowDownBoldCircle"
@@ -170,10 +226,63 @@ watch(cashflow, (newCashflow) => {
           color="info"
           rounded-full
           small
-          class="hover:shadow-lg transform hover:scale-105 transition-transform duration-200"
           @click="invoice"
         />
       </SectionTitleLineWithButton>
+
+      <NotificationBar v-if="statusMessage" :color="statusColor" :icon="mdiCheckDecagram">
+        {{ statusMessage }}
+      </NotificationBar>
+
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
+
+        <CardBox title="Process Payroll" :icon="mdiCashFast" class="h-full">
+          <p class="mb-4 text-gray-600">
+            Calculate pending commissions based on sales and process payments via FastPay.
+          </p>
+          <div class="flex justify-center mt-6">
+            <BaseButton
+              color="danger"
+              label="Pay Commissions Now"
+              :icon="mdiCashFast"
+              @click="processPayment"
+              large
+            />
+          </div>
+        </CardBox>
+
+        <CardBox title="Schedule" :icon="mdiCalendarClock" class="h-full" is-form @submit.prevent="submitSchedule">
+          <FormField label="Payment Frequency">
+            <FormControl v-model="scheduleForm.frequency" :options="['Manual', 'Weekly', 'Monthly']" />
+          </FormField>
+          <BaseButton type="submit" color="info" label="Save Schedule" outline />
+        </CardBox>
+
+      </div>
+
+      <CardBox title="Company Payment Method" :icon="mdiCreditCard" is-form @submit.prevent="submitCard" class="mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Card Holder">
+            <FormControl v-model="cardForm.holder" placeholder="Company Name" required />
+          </FormField>
+          <FormField label="Card Number">
+            <FormControl v-model="cardForm.number" placeholder="0000 0000 0000 0000" required />
+          </FormField>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Expiry Date">
+                <FormControl v-model="cardForm.expiry" placeholder="MM/YY" required />
+            </FormField>
+            <FormField label="CVC">
+                <FormControl v-model="cardForm.cvc" placeholder="123" type="password" required />
+            </FormField>
+        </div>
+        <template #footer>
+            <BaseButton type="submit" color="success" label="Link Card (Secure Token)" />
+        </template>
+      </CardBox>
+
+      <SectionTitleLineWithButton :icon="mdiTableBorder" title="Cash Flow Analytics" />
 
       <div class="grid grid-cols-1 gap-6 mb-6">
         <CardBox>
@@ -192,7 +301,6 @@ watch(cashflow, (newCashflow) => {
         </CardBox>
       </div>
 
-      <!-- Seção de Julho -->
       <div class="mt-6">
         <h3 class="text-lg font-semibold mb-4">July</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -207,7 +315,6 @@ watch(cashflow, (newCashflow) => {
         </div>
       </div>
 
-      <!-- Seção de Agosto -->
       <div class="mt-6">
         <h3 class="text-lg font-semibold mb-4">August</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -222,7 +329,6 @@ watch(cashflow, (newCashflow) => {
         </div>
       </div>
 
-      <!-- Seção de Setembro -->
       <div class="mt-6">
         <h3 class="text-lg font-semibold mb-4">September</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

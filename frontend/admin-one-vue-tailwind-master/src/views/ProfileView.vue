@@ -1,7 +1,7 @@
 <script setup>
 import { reactive } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiAccount, mdiMail, mdiAsterisk, mdiFormTextboxPassword, mdiGithub } from '@mdi/js'
+import { mdiAccount, mdiMail, mdiAsterisk, mdiFormTextboxPassword, mdiGithub, mdiBank } from '@mdi/js'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
 import BaseDivider from '@/components/BaseDivider.vue'
@@ -28,6 +28,10 @@ const passwordForm = reactive({
   password_confirmation: ''
 })
 
+const ibanForm = reactive({
+  iban: ''
+})
+
 const submitPass = () => {
   if(passwordForm.password != passwordForm.password_confirmation){
     alert("Passwords don't match")
@@ -47,8 +51,27 @@ const submitPass = () => {
       alert('Password updated!');
     })
     .catch((error) => {
-      alert(error.message);
+      alert(error.response?.data?.error || error.message);
   });
+}
+
+const submitIban = () => {
+  if (!ibanForm.iban.startsWith('PT50') || ibanForm.iban.length !== 25) {
+    alert('Invalid IBAN format. Must start with PT50 and have 25 chars.')
+    return
+  }
+
+  axios.post('http://localhost:5000/user/update-iban', {
+    token: localStorage.getItem('token'),
+    iban: ibanForm.iban
+  })
+  .then(() => {
+    alert('IBAN updated successfully! You are now eligible for automatic payments.')
+    ibanForm.iban = ''
+  })
+  .catch((error) => {
+    alert('Error updating IBAN: ' + (error.response?.data?.error || error.message))
+  })
 }
 </script>
 
@@ -63,6 +86,7 @@ const submitPass = () => {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <CardBox is-form @submit.prevent="submitPass">
+          <h3 class="text-lg font-bold mb-4">Change Password</h3>
           <FormField label="Current password" help="Required. Your current password">
             <FormControl
               v-model="passwordForm.password_current"
@@ -100,10 +124,36 @@ const submitPass = () => {
 
           <template #footer>
             <BaseButtons>
-              <BaseButton type="submit" color="info" label="Submit" />
+              <BaseButton type="submit" color="info" label="Update Password" />
             </BaseButtons>
           </template>
         </CardBox>
+
+        <CardBox is-form @submit.prevent="submitIban">
+          <h3 class="text-lg font-bold mb-4">Payment Settings</h3>
+          <p class="mb-4 text-gray-600 text-sm">
+            Provide your IBAN to receive automatic commission payments.
+            This data is stored with <strong>AES-256 encryption</strong>.
+          </p>
+
+          <FormField label="IBAN" help="Format: PT50... (25 digits)">
+            <FormControl
+              v-model="ibanForm.iban"
+              :icon="mdiBank"
+              name="iban"
+              placeholder="PT50000000000000000000000"
+              maxlength="25"
+              required
+            />
+          </FormField>
+
+          <template #footer>
+            <BaseButtons>
+              <BaseButton type="submit" color="success" label="Save Payment Info" />
+            </BaseButtons>
+          </template>
+        </CardBox>
+
       </div>
     </SectionMain>
   </LayoutAuthenticated>

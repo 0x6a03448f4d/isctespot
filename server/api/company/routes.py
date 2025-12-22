@@ -1,25 +1,119 @@
 import os
+import json
 from flask import Blueprint, request, jsonify, abort, send_file
 from db.db_connector import DBConnector
 from services.process_file import ProcessFile
 from services.process_cash_flow import ProcessCashFlow
-from services.process_sales     import ProcessSales
+from services.process_sales import ProcessSales
 from api.auth.jwt_utils import validate_token
 
-# Novos serviços (Imports corrigidos)
+# Importar serviços de segurança e pagamentos
 from services.fastpay_service import fastpay_service
 from services.security_service import security_service
 
 company = Blueprint('company', __name__)
 
+# --- AUDIT LOGGING (Requisito DDT: Monitorização) ---
+@company.after_request
+def audit_log(response):
+    """
+    Middleware que interceta todos os pedidos à API da empresa e grava logs de auditoria.
+    Regista: Quem, O quê, Quando, IP e Estado.
+    """
+    # Ignorar logs para o método OPTIONS (CORS preflight) ou analytics pesados se necessário
+    if request.method == 'OPTIONS':
+        return response
+
+    try:
+        user_id = None
+        # Tentar extrair UserID do Token (se presente no body JSON)
+        if request.is_json:
+            data = request.get_json(silent=True)
+            if data and 'token' in data:
+                valid, payload = validate_token(data['token'])
+                if valid:
+                    user_id = payload.get('user_id')
+
+        # Mascarar dados sensíveis no body para o log
+        body_content = request.get_data(as_text=True)
+        if 'token' in body_content:
+            # Simplificação: num sistema real usaríamos regex para mascarar apenas o valor
+            body_content = "HIDDEN_SENSITIVE_DATA"
+
+        dbc = DBConnector()
+        # Grava na tabela AuditLogs (criada no passo anterior)
+        dbc.execute_query('create_audit_log', args={
+            'user_id': user_id,
+            'endpoint': request.path,
+            'method': request.method,
+            'ip': request.remote_addr,
+            'headers': str(dict(request.headers)), # Converter headers para string
+            'body': body_content[:1000], # Limitar tamanho
+            'status': response.status_code
+        })
+    except Exception as e:
+        # Falha no log não deve parar a resposta, mas deve ser notada no console
+        print(f"[AUDIT SYSTEM ERROR] Failed to log request: {e}")
+
+    return response
+
+# --- NOVAS ROTAS (DDT) ---
+
+@company.route('/add-card', methods=['POST'])
+def add_company_card():
+    ''' 
+    Associa o cartão de crédito da empresa para pagamentos.
+    Envia dados para FastPay e guarda apenas o TOKEN.
+    '''
+    data = request.get_json()
+    is_valid, payload = validate_token(data.get('token'))
+    if not is_valid or not payload.get('is_admin'):
+        return jsonify({'status': 'Unauthorized'}), 403
+
+    # Simulação: Enviar dados sensíveis (PAN, CVV) para FastPay
+    # fastpay_token = fastpay_service.tokenize_card(data)
+    # Aqui geramos um token mock seguro
+    comp_id = payload['comp_id']
+    mock_token = f"tok_company_{comp_id}_secure"
+
+    dbc = DBConnector()
+    dbc.execute_query('update_company_card_token', args={
+        'token': mock_token,
+        'company_id': comp_id
+    })
+
+    return jsonify({"message": "Card successfully associated", "token_mask": "****" + mock_token[-4:]}), 200
+
+@company.route('/schedule-pay', methods=['POST'])
+def schedule_pay():
+    ''' Configura a frequência de pagamentos automáticos '''
+    data = request.get_json()
+    is_valid, payload = validate_token(data.get('token'))
+    if not is_valid or not payload.get('is_admin'):
+        return jsonify({'status': 'Unauthorized'}), 403
+
+    frequency = data.get('frequency_type') # 'Weekly', 'Monthly', 'Manual'
+    
+    dbc = DBConnector()
+    dbc.execute_query('update_company_schedule', args={
+        'schedule': frequency,
+        'company_id': payload['comp_id']
+    })
+
+    return jsonify({"message": f"Schedule updated to {frequency}"}), 200
+
 @company.route('/pay', methods=['POST'])
 def process_company_payments():
     ''' 
-    Endpoint Crítico: Executa pagamentos automáticos.
+    Endpoint Crítico: Executa pagamentos automáticos com cálculo REAL.
     Mitigação S (Spoofing): Valida token e permissões de admin.
+    Mitigação R (Repudiation): Exige Assinatura Digital (Criptografia Assimétrica).
     '''
-    # 1. Autenticação e Autorização (Padrão existente)
+    # 1. Autenticação e Autorização
     dict_data = request.get_json()
+    if not dict_data:
+        return jsonify({'status': 'Bad Request', 'message': 'No data provided'}), 400
+
     token = dict_data.get('token')
     is_valid, payload = validate_token(token)
     
@@ -29,52 +123,84 @@ def process_company_payments():
     user_id = payload['user_id']
     comp_id = payload['comp_id']
 
+    # 2. Verificação de Assinatura Digital (Criptografia Assimétrica)
+    signature_hex = request.headers.get('X-Admin-Signature')
+    data_to_verify = token 
+
+    if not signature_hex:
+        return jsonify({"error": "Missing Digital Signature (X-Admin-Signature)"}), 403
+
+    if not security_service.verify_payment_signature(data_to_verify, signature_hex):
+        print(f"[SECURITY] Payment rejected: Invalid Digital Signature from User {user_id}")
+        return jsonify({"error": "Invalid Digital Signature. Non-repudiation check failed."}), 403
+
     try:
-        # 2. Obter token da empresa (Payment Source) - Simulado
-        company_card_token = "tok_fp_company_12345" 
+        dbc = DBConnector()
 
-        # 3. Buscar Pagamentos Pendentes
-        # SQL Simulado - ajusta à tua tabela real se necessário
-        # Assumimos que tens uma lógica para saber quem pagar. 
-        # Para o exemplo, vamos usar dados fictícios seguros.
-        
-        # Exemplo: Lista de IBANs cifrados que viriam da DB
-        pending_payments = [
-            {'encrypted_iban': security_service.encrypt_sensitive_data('PT5000001111222233334'), 'amount': 150.00},
-            {'encrypted_iban': security_service.encrypt_sensitive_data('PT5000009999888877776'), 'amount': 300.50}
-        ]
+        # 3. Obter token da empresa (Payment Source) da DB
+        company_card_token = dbc.execute_query('get_company_card_token', args=comp_id)
+        if not company_card_token:
+            return jsonify({"error": "Company has no payment card configured. Use /add-card first."}), 400
 
-        if not pending_payments:
-            return jsonify({"message": "No pending payments found"}), 200
+        # 4. Calcular Pagamentos Pendentes (Lógica Real)
+        # Vai buscar comissões baseadas nas Vendas * %Comissão
+        pending_commissions = dbc.execute_query('get_pending_commissions', args=comp_id)
 
-        # 4. Preparar Payload (Decifrar em memória -> Enviar)
+        if not pending_commissions:
+            return jsonify({"message": "No pending commissions found to pay."}), 200
+
+        # 5. Preparar Payload (Decifrar em memória -> Enviar)
         targets = []
-        for p in pending_payments:
-            # Decifra apenas no momento do uso
-            clear_iban = security_service.decrypt_sensitive_data(p['encrypted_iban'])
-            targets.append({
-                "iban": clear_iban,
-                "amount": p['amount']
-            })
+        for comm in pending_commissions:
+            # comm = {'UserID': 1, 'EncryptedIBAN': '...', 'TotalToPay': 123.45}
+            encrypted_iban = comm.get('EncryptedIBAN')
+            amount = float(comm.get('TotalToPay', 0))
 
-        # 5. Chamar FastPay
+            if encrypted_iban and amount > 0:
+                clear_iban = security_service.decrypt_sensitive_data(encrypted_iban)
+                if clear_iban:
+                    targets.append({
+                        "iban": clear_iban,
+                        "amount": amount
+                    })
+                else:
+                    print(f"[ERROR] Could not decrypt IBAN for UserID {comm['UserID']}")
+
+        if not targets:
+            return jsonify({"error": "Found commissions but failed to prepare targets (Decryption error?)"}), 500
+
+        # 6. Chamar FastPay
         result = fastpay_service.process_bulk_payment(company_card_token, targets)
 
-        # 6. Responder
-        if result['status'] == 'success':
+        # 7. Responder e Logar na DB
+        if result['status'] in ['success', 'processing']:
+            
+            total_amount = sum(t['amount'] for t in targets)
+            
+            dbc.execute_query('create_payment', args={
+                'company_id': comp_id,
+                'user_id': user_id,
+                'transaction_id': result.get('transaction_id'),
+                'amount': total_amount,
+                'signature': signature_hex 
+            })
+
+            print(f"[AUDIT] Payment processed for Admin {user_id}. Transaction ID: {result.get('transaction_id')}")
+            
             return jsonify({
                 "message": "Payments processed successfully",
-                "details": result
+                "details": result,
+                "total_paid": total_amount,
+                "recipients_count": len(targets)
             }), 200
         else:
             return jsonify({"error": "Payment processor rejected the request"}), 500
 
     except Exception as e:
-        # Requisito E: Masking nos logs de erro (não expor detalhes sensíveis no print)
         print(f"[ERROR] Payment processing failed: {str(e)}") 
         return jsonify({"error": "Internal Server Error"}), 500
 
-# --- Rotas Existentes Mantidas ---
+# --- Rotas Existentes ---
 
 @company.route('/analytics', methods=['GET', 'POST'])
 def list_sales_analytics():
@@ -184,7 +310,7 @@ def cash_flow():
         {
         'profit': pcf7.profit + pcf8.profit + pcf9.profit,
         'status': 'Ok',
-        'July': pcf7.__dict__, # Simplificação para brevidade, manter original se preferir
+        'July': pcf7.__dict__, 
         'August': pcf8.__dict__,
         'September': pcf9.__dict__
         }

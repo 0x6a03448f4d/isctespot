@@ -1,7 +1,7 @@
 import mariadb
 
 connection = mariadb.connect(
-    host="mariadb",  # <--- ALTERADO DE 'localhost' PARA 'mariadb'
+    host="mariadb",
     user="root",
     password="teste123",
     port=3306
@@ -32,14 +32,14 @@ try:
         isActive TINYINT(1) NULL DEFAULT '0',
         IsAdmin TINYINT(1) NULL DEFAULT '0',
         IsAgent TINYINT(1) NULL DEFAULT '0',
+        EncryptedIBAN TEXT NULL DEFAULT NULL, -- NOVO: IBAN do colaborador
         PRIMARY KEY (UserID) USING BTREE,
         UNIQUE INDEX Username (Username) USING BTREE,
         UNIQUE INDEX Email (Email) USING BTREE,
         INDEX CompanyID (CompanyID) USING BTREE
     )
     COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ENGINE=InnoDB;
 
     CREATE TABLE IF NOT EXISTS Companies (
         CompanyID INT(11) NOT NULL AUTO_INCREMENT,
@@ -48,13 +48,14 @@ try:
         Revenue INT(11) NULL DEFAULT NULL,
         CreatedAt TIMESTAMP NULL DEFAULT current_timestamp(),
         CompanyName VARCHAR(255) NOT NULL COLLATE 'latin1_swedish_ci',
+        FastPayCardToken VARCHAR(255) NULL, -- NOVO: Token do cartão da empresa
+        PaymentSchedule VARCHAR(50) DEFAULT 'Manual', -- NOVO: Agendamento
         PRIMARY KEY (CompanyID) USING BTREE,
         INDEX AdminUserID (AdminUserID) USING BTREE,
         CONSTRAINT companies_ibfk_1 FOREIGN KEY (AdminUserID) REFERENCES Users (UserID) ON UPDATE RESTRICT ON DELETE RESTRICT
     )
     COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ENGINE=InnoDB;
 
     CREATE TABLE IF NOT EXISTS Clients (
         ClientID INT(11) NOT NULL AUTO_INCREMENT,
@@ -72,8 +73,7 @@ try:
         UNIQUE INDEX Email (Email) USING BTREE
     )
     COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ENGINE=InnoDB;
 
     CREATE TABLE IF NOT EXISTS Products (
         ProductID INT(11) NOT NULL AUTO_INCREMENT,
@@ -88,8 +88,7 @@ try:
         CONSTRAINT products_ibfk_1 FOREIGN KEY (CompanyID) REFERENCES Companies (CompanyID) ON UPDATE RESTRICT ON DELETE RESTRICT
     )
     COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ENGINE=InnoDB;
     
     CREATE TABLE IF NOT EXISTS Sales (
         SaleID INT(11) NOT NULL AUTO_INCREMENT,
@@ -107,8 +106,7 @@ try:
         CONSTRAINT sales_ibfk_3 FOREIGN KEY (ProductID) REFERENCES Products (ProductID) ON UPDATE RESTRICT ON DELETE SET NULL
     )
     COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ENGINE=InnoDB;
     
     CREATE TABLE IF NOT EXISTS SupportTickets (
         TicketID INT(11) NOT NULL AUTO_INCREMENT,
@@ -128,8 +126,42 @@ try:
             ON DELETE SET NULL
     )
     COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ENGINE=InnoDB;
+
+    -- TABELA PARA HISTÓRICO DE PAGAMENTOS
+    CREATE TABLE IF NOT EXISTS Payments (
+        PaymentID INT(11) NOT NULL AUTO_INCREMENT,
+        CompanyID INT(11) NOT NULL,
+        AdminUserID INT(11) NOT NULL,
+        TransactionID VARCHAR(255) NOT NULL,
+        Amount DECIMAL(10, 2) NOT NULL,
+        Status VARCHAR(50) DEFAULT 'Pending',
+        DigitalSignature TEXT,
+        CreatedAt TIMESTAMP NULL DEFAULT current_timestamp(),
+        UpdatedAt TIMESTAMP NULL DEFAULT NULL ON UPDATE current_timestamp(),
+        PRIMARY KEY (PaymentID) USING BTREE,
+        INDEX CompanyID (CompanyID) USING BTREE,
+        CONSTRAINT payments_ibfk_1 FOREIGN KEY (CompanyID) REFERENCES Companies (CompanyID),
+        CONSTRAINT payments_ibfk_2 FOREIGN KEY (AdminUserID) REFERENCES Users (UserID)
+    )
+    COLLATE='latin1_swedish_ci'
+    ENGINE=InnoDB;
+
+    -- NOVA TABELA DE AUDITORIA (DDT Requirement)
+    CREATE TABLE IF NOT EXISTS AuditLogs (
+        LogID INT(11) NOT NULL AUTO_INCREMENT,
+        UserID INT(11) NULL,
+        Endpoint VARCHAR(100),
+        Method VARCHAR(10),
+        SourceIP VARCHAR(50),
+        RequestHeaders TEXT,
+        RequestBody TEXT, 
+        ResponseStatus INT,
+        Timestamp TIMESTAMP DEFAULT current_timestamp(),
+        PRIMARY KEY (LogID) USING BTREE
+    )
+    COLLATE='latin1_swedish_ci'
+    ENGINE=InnoDB;
     """
 
     for statement in create_tables_sql.split(';'):

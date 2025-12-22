@@ -2,14 +2,15 @@ import mariadb
 import sys
 import os
 import random
+import uuid
 
-# Adicionar a diretoria /app ao path para conseguir importar os serviços do servidor
+# Permitir importar serviços do servidor para encriptação
 sys.path.append('/app')
 
 try:
     from services.security_service import security_service
 except ImportError:
-    print("Warning: Could not import security_service. IBANs might not be encrypted correctly.")
+    print("Warning: Could not import security_service. Running without encryption (Data might be invalid).")
     security_service = None
 
 from fakes.fake_users import data as fake_users
@@ -22,7 +23,7 @@ from fakes.fake_tickets import data as fake_tickets
 # Database connection
 try:
     db = mariadb.connect(
-        host="mariadb",  # <--- ALTERADO DE 'localhost' PARA 'mariadb'
+        host="mariadb",
         user="root",
         password="teste123",
         port=3306,
@@ -34,14 +35,23 @@ except mariadb.Error as e:
     sys.exit(1)
 
 def get_fake_iban():
-    """Gera um IBAN fictício para testes"""
-    digits = ''.join([str(random.randint(0, 9)) for _ in range(21)])
-    return f"PT50{digits}"
+    return f"PT50{random.randint(100000000000000000000, 999999999999999999999)}"
+
+def encrypt_helper(data):
+    if security_service:
+        return security_service.encrypt_sensitive_data(data)
+    return f"PLAIN_{data}" # Fallback apenas se import falhar
+
+# --- INSERTS ATUALIZADOS ---
 
 def insert_users():
-    print("Inserting Users...")
-    fake_users_tuples = [
-        (
+    print("Inserting Users with IBANs...")
+    fake_users_tuples = []
+    for user in fake_users:
+        # Simular que alguns users têm IBAN configurado (para receberem comissão)
+        iban = encrypt_helper(get_fake_iban()) if user['IsAdmin'] == 0 else None
+        
+        fake_users_tuples.append((
             user.get("Username"),
             user.get("PasswordHash"),
             user.get("Email"),
@@ -53,61 +63,51 @@ def insert_users():
             user.get("LastLogout"),
             user.get("isActive", 0),
             user.get("IsAdmin", 0),
-            user.get("IsAgent", 0)
-        )
-        for user in fake_users
-    ]
+            user.get("IsAgent", 0),
+            iban # EncryptedIBAN
+        ))
+
     cursor.executemany("""
-    INSERT INTO Users (Username, PasswordHash, Email, CreatedAt, LastLogin, CompanyID, ResetPassword, CommissionPercentage, LastLogout, isActive, IsAdmin, IsAgent)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO Users (Username, PasswordHash, Email, CreatedAt, LastLogin, CompanyID, ResetPassword, CommissionPercentage, LastLogout, isActive, IsAdmin, IsAgent, EncryptedIBAN)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, fake_users_tuples)
     db.commit()
 
 def insert_companies():
-    print("Inserting Companies...")
-    fake_companies_tuples = [
-        (
+    print("Inserting Companies with Tokens...")
+    fake_companies_tuples = []
+    for company in fake_companies:
+        # Simular token de cartão já associado
+        token = f"tok_company_{company['CompanyID']}_setup"
+        
+        fake_companies_tuples.append((
             company["CompanyID"],
             company["AdminUserID"],
             company["NumberOfEmployees"],
             company["Revenue"],
             company["CreatedAt"],
-            company["CompanyName"]
-        )
-        for company in fake_companies
-    ]
+            company["CompanyName"],
+            token, # FastPayCardToken
+            "Manual" # PaymentSchedule
+        ))
+
     cursor.executemany("""
-    INSERT INTO Companies (CompanyID, AdminUserID, NumberOfEmployees, Revenue, CreatedAt, CompanyName)
-    VALUES (%s, %s, %s, %s, %s, %s)
+    INSERT INTO Companies (CompanyID, AdminUserID, NumberOfEmployees, Revenue, CreatedAt, CompanyName, FastPayCardToken, PaymentSchedule)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, fake_companies_tuples)
     db.commit()
 
+# ... (Manter insert_clients, insert_products, insert_sales, insert_tickets IGUAIS) ...
 def insert_clients():
-    print("Inserting Clients with Encrypted IBANs...")
+    print("Inserting Clients...")
     client_tuples = []
-    
     for client in fake_clients:
-        plain_iban = get_fake_iban()
-        encrypted_iban = None
-        if security_service:
-            try:
-                encrypted_iban = security_service.encrypt_sensitive_data(plain_iban)
-            except Exception as e:
-                print(f"Error encrypting IBAN for client {client.get('FirstName')}: {e}")
-
+        iban = encrypt_helper(get_fake_iban())
         client_tuples.append((
-            client["FirstName"],
-            client["LastName"],
-            client["Email"],
-            client["PhoneNumber"],
-            client["Address"],
-            client["City"],
-            client["Country"],
-            client["CreatedAt"],
-            client["CompanyID"],
-            encrypted_iban
+            client["FirstName"], client["LastName"], client["Email"], client["PhoneNumber"],
+            client["Address"], client["City"], client["Country"], client["CreatedAt"],
+            client["CompanyID"], iban
         ))
-
     cursor.executemany("""
     INSERT INTO Clients (FirstName, LastName, Email, PhoneNumber, Address, City, Country, CreatedAt, CompanyID, EncryptedIBAN)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -116,61 +116,23 @@ def insert_clients():
 
 def insert_products():
     print("Inserting Products...")
-    fake_products_tuples = [
-        (
-            product["ProductID"],
-            product["CompanyID"],
-            product["ProductName"],
-            product["FactoryPrice"],
-            product["SellingPrice"],
-            product["CreatedAt"]
-        )
-        for product in fake_products
-    ]
-    cursor.executemany("""
-    INSERT INTO Products (ProductID, CompanyID, ProductName, FactoryPrice, SellingPrice, CreatedAt)
-    VALUES (%s, %s, %s, %s, %s, %s)
-    """, fake_products_tuples)
+    tuples = [(p["ProductID"], p["CompanyID"], p["ProductName"], p["FactoryPrice"], p["SellingPrice"], p["CreatedAt"]) for p in fake_products]
+    cursor.executemany("INSERT INTO Products (ProductID, CompanyID, ProductName, FactoryPrice, SellingPrice, CreatedAt) VALUES (%s, %s, %s, %s, %s, %s)", tuples)
     db.commit()
 
 def insert_sales():
     print("Inserting Sales...")
-    fake_sales_tuples = [
-        (
-            sale["UserID"],
-            sale["ClientID"],
-            sale["ProductID"],
-            sale['Quantity'],
-            sale["SaleDate"]
-        )
-        for sale in fake_sales
-    ]
-    cursor.executemany("""
-    INSERT INTO Sales (UserID, ClientID, ProductID, Quantity, SaleDate)
-    VALUES (%s, %s, %s, %s, %s)
-    """, fake_sales_tuples)
+    tuples = [(s["UserID"], s["ClientID"], s["ProductID"], s['Quantity'], s["SaleDate"]) for s in fake_sales]
+    cursor.executemany("INSERT INTO Sales (UserID, ClientID, ProductID, Quantity, SaleDate) VALUES (%s, %s, %s, %s, %s)", tuples)
     db.commit()
 
 def insert_tickets():
     print("Inserting Tickets...")
-    fake_tickets_tuples = [
-        (
-            ticket["UserID"],
-            ticket["Status"],
-            ticket["Category"],
-            ticket['Description'],
-            ticket["Messages"],
-            ticket["CreatedAt"],
-            ticket["UpdatedAt"]
-        )
-        for ticket in fake_tickets
-    ]
-    cursor.executemany("""
-    INSERT INTO SupportTickets (UserID, Status, Category, Description, Messages, CreatedAt, UpdatedAt)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, fake_tickets_tuples)
+    tuples = [(t["UserID"], t["Status"], t["Category"], t['Description'], t["Messages"], t["CreatedAt"], t["UpdatedAt"]) for t in fake_tickets]
+    cursor.executemany("INSERT INTO SupportTickets (UserID, Status, Category, Description, Messages, CreatedAt, UpdatedAt) VALUES (%s, %s, %s, %s, %s, %s, %s)", tuples)
     db.commit()
 
+# Ordem de execução
 insert_users()
 insert_companies()
 insert_clients()
@@ -180,5 +142,4 @@ insert_tickets()
 
 cursor.close()
 db.close()
-
-print("Data inserted successfully!")
+print("Data populated successfully with encrypted fields.")
