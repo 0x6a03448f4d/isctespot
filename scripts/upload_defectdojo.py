@@ -29,7 +29,7 @@ def upload_scan(file_path, scan_type):
         print(file_path, response.status_code, response.text)
 
 # Upload scans
-upload_scan("trivy-dependencies.json", "Trivy Dependecy")
-upload_scan("trivy-backend.json", "Trivy Scan Backend")
-upload_scan("trivy-frontend.json", "Trivy Scan Frontend")
-upload_scan("dependency-check.json", "Dependency Check")
+upload_scan("trivy-dependencies.json", "Trivy", "Trivy FS Dependencies")
+upload_scan("trivy-backend.json", "Trivy Scan", "Trivy Backend docker image")
+upload_scan("trivy-frontend.json", "Trivy Scan", "Trivy Frontend docker image")
+upload_scan("dependency-check.json", "Dependency Check Scan", "OWASP Dependency-Check")
