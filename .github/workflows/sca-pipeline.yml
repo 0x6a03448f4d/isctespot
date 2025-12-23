@@ -81,7 +81,7 @@ jobs:
             trivy-dependencies.json
             trivy-frontend.json
             trivy-backend.json
-            dependency-check.json
+            dependency-check.xml
             sbom.json
 
       - name: Upload findings to DefectDojo
