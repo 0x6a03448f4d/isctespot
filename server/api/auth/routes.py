@@ -71,20 +71,42 @@ def login():
 
     return jsonify({'status': 'Bad credentials'}), 403
 
+
 @auth.route('/logout', methods=['POST'])
 def logout():
-    ''' Logout function'''
+    ''' Logout function '''
     dbc = DBConnector()
-    dict_data = request.get_json()
-    _id = dbc.execute_query(query='update_user_activity', args={
-        'user_id': dict_data['user_id'],
+    
+    # 1. Tenta obter o token do Body
+    dict_data = request.get_json(silent=True)
+    token = dict_data.get('token') if dict_data else None
+
+    # 2. Se não estiver no body, tenta no Header (Authorization: Bearer X)
+    if not token:
+        auth_header = request.headers.get('Authorization')
+        if auth_header and " " in auth_header:
+            token = auth_header.split(" ")[1]
+
+    # 3. Valida o token para saber QUEM está a fazer logout
+    is_valid, payload = validate_token(token)
+    
+    # Se o token já for inválido, o logout "já está feito"
+    if not is_valid or not payload:
+        return jsonify({'status': 'Ok', 'message': 'Token already invalid'}), 200
+
+    user_id = payload['user_id']
+
+    # 4. Desativa o utilizador na BD
+    result = dbc.execute_query(query='update_user_activity', args={
+        'user_id': user_id,
         'active': False
     })
-    if not isinstance(_id, int):
-        return jsonify({'status': 'Bad request'}), 400
-    else:
-        return jsonify({'status': 'Ok'}), 200
 
+    if isinstance(result, int):
+        return jsonify({'status': 'Ok'}), 200
+    else:
+        # Se falhar a BD, retorna 500 para saberes que foi erro técnico
+        return jsonify({'status': 'Database Error'}), 500
 @auth.route('/user/reset-password', methods=['POST'])
 def reset_password():
     ''' Reset password function '''

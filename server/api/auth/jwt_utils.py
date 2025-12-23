@@ -1,6 +1,7 @@
 from flask import current_app
 import jwt
 import traceback
+from db.db_connector import DBConnector  # <--- [FIX] Importar para aceder à BD
 
 def issue_token(user_id: int, comp_id: int, is_admin: bool, is_agent: bool) -> str:
     """ Create a new token with user information """
@@ -13,17 +14,14 @@ def issue_token(user_id: int, comp_id: int, is_admin: bool, is_agent: bool) -> s
     private_key = current_app.config.get('JWT_PRIVATE_PEM')
     if private_key:
         try:
-            # PyJWT 2.x retorna string, PyJWT 1.x retornava bytes
             token = jwt.encode(payload, key=private_key, algorithm='RS256')
-            # Garante compatibilidade se retornar bytes
             str_token = token.decode('utf-8') if isinstance(token, (bytes, bytearray)) else token
             return str_token
         except Exception as e:
             raise Exception('Issue RS256 token failed', e) from e
 
 def validate_token(token: str):
-    """ Validate JWT token """
-    # print("token", token) # Debug opcional
+    """ Validate JWT token with Database Check """
     if not token:
         return False, None
     try:
@@ -35,11 +33,27 @@ def validate_token(token: str):
     try:
         public_key_pem = current_app.config.get('JWT_PUBLIC_PEM', '')
         if public_key_pem:
+            # 1. Validação Criptográfica (Assinatura)
             payload = jwt.decode(
                 token,
                 key=public_key_pem,
-                algorithms=['RS256']  # <--- OBRIGATÓRIO no PyJWT 2.x
+                algorithms=['RS256']
             )
+
+            # --- [FIX START] VALIDAÇÃO DE ESTADO NA BASE DE DADOS ---
+            # Verifica se o token pertence a um utilizador que fez logout (isActive=0)
+            user_id = payload.get('user_id')
+            if user_id:
+                dbc = DBConnector()
+                # Usa a query existente 'get_user_by_id' que retorna {UserID, isActive, ...}
+                user_data = dbc.execute_query('get_user_by_id', args=user_id)
+                
+                # Se o utilizador não for encontrado ou isActive for 0/False
+                if not user_data or not user_data.get('isActive'):
+                    print(f"[AUTH SECURITY] Token rejected: User {user_id} is inactive (Logged out).")
+                    return False, None
+            # --- [FIX END] ---
+
             return True, payload
     except Exception as e:
         print("Error decoding RS256 with public key", e)

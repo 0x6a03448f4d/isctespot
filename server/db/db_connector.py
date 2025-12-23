@@ -39,16 +39,13 @@ class DBConnector:
             if query == 'get_user_by_name':
                 cursor.execute("SELECT UserID FROM Users WHERE Username = ?", (args,))
                 result = cursor.fetchone()
-                try:
-                    if isinstance(result, tuple):
-                        val = result[0]['UserID']
-                        if val == 1: return True
-                    else:
-                        if result and result["UserID"] == 0: return False
-                        if result: return True
-                except TypeError:
-                    return 'TypeError'
-
+                
+                # CORREÇÃO: Retornar o ID, não True/False
+                if result:
+                    # Como estás a usar cursor(dictionary=True)
+                    return result['UserID']
+                else:
+                    return False
             elif query == 'get_user_password':
                 cursor.execute("SELECT PasswordHash FROM Users WHERE UserID = ?", (args,))
                 result = cursor.fetchone()
@@ -109,7 +106,8 @@ class DBConnector:
                     return result
                 else:
                     return False
-
+                
+            
             elif query == 'get_user_sales':
                 cursor.execute(
                     f"""
@@ -618,6 +616,19 @@ class DBConnector:
                 connection.commit()
                 result = cursor.rowcount
                 return result > 0
+            elif query == 'update_company_card_token':
+            # Guarda o token do cartão na tabela Companies
+                cursor.execute(
+                "UPDATE Companies SET FastPayCardToken = ? WHERE CompanyID = ?", (args['token'], args['company_id']))
+                connection.commit()
+                return True
+
+            elif query == 'get_company_card_token':
+            # Recupera o token para processar pagamentos
+                cursor.execute(
+                "SELECT FastPayCardToken FROM Companies WHERE CompanyID = ?", (args,))
+                row = cursor.fetchone()
+                return row[0] if row else None
 
         except mariadb.Error as e:
             print(f"Error: {e}")
